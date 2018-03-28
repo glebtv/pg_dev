@@ -2,12 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/urfave/cli"
 )
 
@@ -30,7 +31,7 @@ func getConnStr() string {
 	return strings.Join(connstr, " ")
 }
 
-func connect() (sql.Db, error) {
+func connect() (*sql.DB, error) {
 	return sql.Open("postgres", getConnStr())
 }
 
@@ -92,6 +93,14 @@ func init() {
 					Name:  "user, u",
 					Usage: "Owner name",
 				},
+				cli.BoolFlag{
+					Name:  "no_drop",
+					Usage: "Don't drop, just create",
+				},
+				cli.BoolFlag{
+					Name:  "no_create",
+					Usage: "Don't create, just drop",
+				},
 			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() > 0 {
@@ -103,16 +112,31 @@ func init() {
 					if err != nil {
 						return cli.NewExitError("unable to connect to postgresql: "+err.Error(), 3)
 					}
+
 					schema := c.String("schema")
-					_, err := db.Query("DROP SCHEMA $1 CASCADE", schema)
-					if err != nil {
-						return cli.NewExitError("unable to drop schema "+schema+": "+err.Error(), 4)
+					quoted := pq.QuoteIdentifier(schema)
+
+					no_create := c.Bool("no_create")
+					no_drop := c.Bool("no_drop")
+
+					if !no_drop {
+						_, err = db.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", quoted))
+						if err != nil {
+							return cli.NewExitError("unable to drop schema "+schema+": "+err.Error(), 4)
+						}
 					}
 
-					user := c.String("user")
-					_, err := db.Query("CREATE SCHEMA $1 OWNED BY $2", schema, user)
-					if err != nil {
-						return cli.NewExitError("unable to create schema "+schema+" with owner "+user+": "+err.Error(), 5)
+					if !no_create {
+						user := c.String("user")
+						quoted_user := pq.QuoteIdentifier(user)
+						if user != "" {
+							_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s AUTHORIZATION %s", quoted, quoted_user))
+						} else {
+							_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s", quoted))
+						}
+						if err != nil {
+							return cli.NewExitError("unable to create schema "+schema+" with owner "+user+": "+err.Error(), 5)
+						}
 					}
 
 				} else {
