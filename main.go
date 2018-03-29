@@ -3,8 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +22,37 @@ var port = 5432
 var user = "postgres"
 var password = ""
 var dbname = ""
+
+func Execute(command string, arg ...string) {
+	cmd := exec.Command(command, arg...)
+
+	stdoutIn, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+	stderrIn, err := cmd.StderrPipe()
+	if err != nil {
+		panic(err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		io.Copy(os.Stdout, stdoutIn)
+	}()
+
+	go func() {
+		io.Copy(os.Stderr, stderrIn)
+	}()
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatalf(command+" "+strings.Join(arg, " ")+" failed with %s\n", err)
+	}
+}
 
 func getConnStr() string {
 	connstr := make([]string, 0)
@@ -96,6 +129,37 @@ func init() {
 			EnvVar:      "PGPASSWORD",
 			Destination: &password,
 		},
+		cli.BoolFlag{
+			Name:  "migrate",
+			Usage: "Run rails migrations",
+		},
+		cli.BoolFlag{
+			Name:  "seed",
+			Usage: "Run rails seeds",
+		},
+	}
+
+	App.After = func(c *cli.Context) error {
+		path, err := exec.LookPath("bundle")
+		if err != nil {
+			log.Fatal("bundler not found")
+			return nil
+		}
+
+		fmt.Printf("bundler is available at %s\n", path)
+
+		migrate := c.Bool("migrate")
+		if migrate {
+			fmt.Printf("running migrations\n")
+			Execute(path, "exec", "rake db:migrate")
+		}
+		seed := c.Bool("seed")
+		if seed {
+			fmt.Printf("running seeds\n")
+			Execute(path, "exec", "rake db:seed")
+		}
+		fmt.Printf("done!\n")
+		return nil
 	}
 
 	App.Commands = []cli.Command{
