@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -22,17 +23,36 @@ var dbname = ""
 
 func getConnStr() string {
 	connstr := make([]string, 0)
-	connstr = append(connstr, "host="+host)
+	if host != "" {
+		connstr = append(connstr, "host="+Quote(host))
+	}
 	connstr = append(connstr, "port="+strconv.Itoa(port))
-	connstr = append(connstr, "user="+user)
-	connstr = append(connstr, "dbname="+dbname)
-	connstr = append(connstr, "password="+password)
+	connstr = append(connstr, "user="+Quote(user))
+
+	if dbname != "" {
+		connstr = append(connstr, "dbname="+Quote(dbname))
+	}
+
+	if password != "" {
+		connstr = append(connstr, "password="+Quote(password))
+	}
+
 	connstr = append(connstr, "sslmode=disable")
 	return strings.Join(connstr, " ")
 }
 
+func Quote(name string) string {
+	end := strings.IndexRune(name, 0)
+	if end > -1 {
+		name = name[:end]
+	}
+	return `'` + strings.Replace(name, `'`, `\'`, -1) + `'`
+}
+
 func connect() (*sql.DB, error) {
-	return sql.Open("postgres", getConnStr())
+	connStr := getConnStr()
+	fmt.Println("connecting:", connStr)
+	return sql.Open("postgres", connStr)
 }
 
 func init() {
@@ -72,7 +92,7 @@ func init() {
 		cli.StringFlag{
 			Name:        "password",
 			Usage:       "postgresql password",
-			Value:       "postgres",
+			Value:       "",
 			EnvVar:      "PGPASSWORD",
 			Destination: &password,
 		},
@@ -90,7 +110,7 @@ func init() {
 					Value: "public",
 				},
 				cli.StringFlag{
-					Name:  "user, u",
+					Name:  "owner, o",
 					Usage: "Owner name",
 				},
 				cli.BoolFlag{
@@ -103,45 +123,123 @@ func init() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				if c.NArg() > 0 {
-					dbname = c.Args().Get(0)
-					if dbname == "" {
-						return cli.NewExitError("no db name provided.", 2)
-					}
-					db, err := connect()
-					if err != nil {
-						return cli.NewExitError("unable to connect to postgresql: "+err.Error(), 3)
-					}
-
-					schema := c.String("schema")
-					quoted := pq.QuoteIdentifier(schema)
-
-					no_create := c.Bool("no_create")
-					no_drop := c.Bool("no_drop")
-
-					if !no_drop {
-						_, err = db.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", quoted))
-						if err != nil {
-							return cli.NewExitError("unable to drop schema "+schema+": "+err.Error(), 4)
-						}
-					}
-
-					if !no_create {
-						user := c.String("user")
-						quoted_user := pq.QuoteIdentifier(user)
-						if user != "" {
-							_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s AUTHORIZATION %s", quoted, quoted_user))
-						} else {
-							_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s", quoted))
-						}
-						if err != nil {
-							return cli.NewExitError("unable to create schema "+schema+" with owner "+user+": "+err.Error(), 5)
-						}
-					}
-
-				} else {
+				if c.NArg() <= 0 {
 					return cli.NewExitError("no db name provided.", 1)
 				}
+
+				dbname = c.Args().Get(0)
+				if dbname == "" {
+					return cli.NewExitError("no db name provided.", 2)
+				}
+
+				db, err := connect()
+				if err != nil {
+					return cli.NewExitError("unable to connect to postgresql: "+err.Error(), 3)
+				}
+
+				schema := c.String("schema")
+				quoted := pq.QuoteIdentifier(schema)
+
+				no_create := c.Bool("no_create")
+				no_drop := c.Bool("no_drop")
+
+				if !no_drop {
+					q := fmt.Sprintf("DROP SCHEMA %s CASCADE", quoted)
+					log.Println(q)
+					_, err = db.Exec(q)
+					if err != nil {
+						return cli.NewExitError("unable to drop schema "+schema+": "+err.Error(), 4)
+					}
+				}
+
+				if !no_create {
+					user := c.String("owner")
+					quoted_user := pq.QuoteIdentifier(user)
+					if user != "" {
+						q := fmt.Sprintf("CREATE SCHEMA %s AUTHORIZATION %s", quoted, quoted_user)
+						log.Println(q)
+						_, err = db.Exec(q)
+					} else {
+						q := fmt.Sprintf("CREATE SCHEMA %s", quoted)
+						log.Println(q)
+						_, err = db.Exec(q)
+					}
+					if err != nil {
+						return cli.NewExitError("unable to create schema "+schema+" with owner "+user+": "+err.Error(), 5)
+					}
+				}
+
+				return nil
+			},
+		},
+		{
+			Name:    "create",
+			Aliases: []string{"c"},
+			Usage:   "Create user with password {user}, create database {user}_development, and grant him full privileges",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "set_password",
+					Usage: "Set new user password, default {user}",
+				},
+				cli.StringFlag{
+					Name:  "dbname, db",
+					Usage: "Database name, default {user}_development",
+				},
+				cli.StringFlag{
+					Name:  "auth_db_name",
+					Usage: "Authentication database name, default postgres",
+					Value: "postgres",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				if c.NArg() <= 0 {
+					return cli.NewExitError("no user name provided.", 1)
+				}
+
+				uname := c.Args().Get(0)
+				if uname == "" {
+					return cli.NewExitError("no user name provided.", 2)
+				}
+
+				dbname = c.String("auth_db_name")
+				db, err := connect()
+				if err != nil {
+					return cli.NewExitError("unable to connect to postgresql: "+err.Error(), 3)
+				}
+
+				password := c.String("set_password")
+				if password == "" {
+					password = uname
+				}
+				password_quoted := Quote(password)
+				q := fmt.Sprintf("CREATE USER %s WITH PASSWORD %s", uname, password_quoted)
+				log.Println(q)
+				_, err = db.Exec(q)
+				if err != nil {
+					return cli.NewExitError("unable to create user "+uname+": "+err.Error(), 4)
+				}
+
+				new_db_name := c.String("dbname")
+				if new_db_name == "" {
+					new_db_name = uname + "_development"
+				}
+				dbname_quoted := pq.QuoteIdentifier(new_db_name)
+				uname_quoted := pq.QuoteIdentifier(password)
+
+				q = fmt.Sprintf("CREATE DATABASE %s", dbname_quoted)
+				log.Println(q)
+				_, err = db.Exec(q)
+				if err != nil {
+					return cli.NewExitError("unable to create db "+dbname+": "+err.Error(), 5)
+				}
+
+				q = fmt.Sprintf("GRANT ALL ON DATABASE %s TO %s;", dbname_quoted, uname_quoted)
+				log.Println(q)
+				_, err = db.Exec(q)
+				if err != nil {
+					return cli.NewExitError("unable to grant all on db "+dbname+" to user "+uname+": "+err.Error(), 6)
+				}
+
 				return nil
 			},
 		},

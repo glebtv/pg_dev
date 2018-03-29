@@ -1,6 +1,6 @@
 ## PG_DEV
 
-Tool to optimize various things during app development with postgresql
+Tool to optimize various things during app development with postgresql (mostly Ruby On Rails)
 
 ### WARNING
 
@@ -26,6 +26,18 @@ pg_dev -h
 ```
 
 ## Usage
+
+### Create
+
+Create user and db for development
+
+```
+pg_dev c app
+```
+
+Creates user app with password app, and app_development database for him.
+
+### Reset
 
 Drop schema public, create schema public owned by correct user:
 
@@ -82,3 +94,16 @@ OPTIONS:
    --no_create               Don't create, just drop
 ```
 
+```
+> pg_dev c --help
+NAME:
+   pg_dev create - Create user with password {user}, create database {user}_development, and grant him full privileges
+
+USAGE:
+   pg_dev create [command options] [arguments...]
+
+OPTIONS:
+   --set_password value        Set new user password, default {user}
+   --dbname value, --db value  Database name, default {user}_development
+   --auth_db_name value        Authentication database name, default postgres (default: "postgres")
+ ```
