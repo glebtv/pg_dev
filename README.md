@@ -44,7 +44,7 @@ Drop schema public, create schema public owned by correct user:
 **(deletes all data in this database)**
 
 ```
-pg_dev r app_development --user app
+pg_dev r app_development --owner app
 ```
 
 ## Help / Options
