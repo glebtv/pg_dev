@@ -280,7 +280,8 @@ func init() {
 				log.Println(q)
 				_, err = db.Exec(q)
 				if err != nil {
-					return cli.NewExitError("unable to create user "+uname+": "+err.Error(), 4)
+					log.Println("unable to create user " + uname + ": " + err.Error())
+					//return cli.NewExitError("unable to create user "+uname+": "+err.Error(), 4)
 				}
 
 				new_db_name := c.String("dbname")
