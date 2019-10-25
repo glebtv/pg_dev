@@ -22,6 +22,7 @@ var port = 0
 var user = ""
 var password = ""
 var auth_db = ""
+var env = ""
 var DB *sql.DB
 
 func Execute(command string, arg ...string) {
@@ -96,7 +97,7 @@ func init() {
 	App.EnableBashCompletion = true
 	App.Name = "pg_dev"
 	App.Usage = "PostgreSQL dev tool "
-	App.Version = "0.2.1"
+	App.Version = "0.3.0"
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, v",
@@ -137,6 +138,13 @@ func init() {
 			Usage:       "authentication database name, default postgres",
 			Value:       "postgres",
 			Destination: &auth_db,
+		},
+		cli.StringFlag{
+			Name:        "env",
+			Usage:       "db env",
+			Value:       "development",
+			EnvVar:      "RAILS_ENV",
+			Destination: &env,
 		},
 		cli.BoolFlag{
 			Name:  "hstore",
@@ -191,7 +199,7 @@ func init() {
 		{
 			Name:    "reset",
 			Aliases: []string{"r"},
-			Usage:   "Reset public schema for {user}_development database",
+			Usage:   "Reset public schema for {user}_{env} database",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "schema, s",
@@ -200,7 +208,7 @@ func init() {
 				},
 				cli.StringFlag{
 					Name:  "dbname, db",
-					Usage: "Database name, default {user}_development",
+					Usage: "Database name, default {user}_{env}",
 				},
 				cli.BoolFlag{
 					Name:  "no_drop",
@@ -212,6 +220,10 @@ func init() {
 				},
 			},
 			Action: func(c *cli.Context) error {
+				if env == "production" {
+					return cli.NewExitError("this tool is not designed for production env usage", 30)
+				}
+
 				if c.NArg() <= 0 {
 					return cli.NewExitError("no user name provided.", 1)
 				}
@@ -220,12 +232,12 @@ func init() {
 					return cli.NewExitError("no user name provided.", 2)
 				}
 
-				if strings.HasSuffix(uname, "_development") {
-					return cli.NewExitError("username should not have _development suffix.", 10)
+				if strings.HasSuffix(uname, "_"+env) {
+					return cli.NewExitError("username should not have _"+env+" suffix.", 10)
 				}
 
 				if auth_db == "" || auth_db == "postgres" {
-					auth_db = uname + "_development"
+					auth_db = uname + "_" + env
 				}
 
 				db, err := connect()
@@ -269,7 +281,7 @@ func init() {
 		{
 			Name:    "create",
 			Aliases: []string{"c"},
-			Usage:   "Create user with password {user}, create database {user}_development, and grant him full privileges",
+			Usage:   "Create user with password {user}, create database {user}_{env}, and grant him full privileges",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "set_password",
@@ -277,10 +289,14 @@ func init() {
 				},
 				cli.StringFlag{
 					Name:  "dbname, db",
-					Usage: "Database name, default {user}_development",
+					Usage: "Database name, default {user}_{env}",
 				},
 			},
 			Action: func(c *cli.Context) error {
+				if env == "production" {
+					return cli.NewExitError("this tool is not designed for production env usage", 30)
+				}
+
 				if c.NArg() <= 0 {
 					return cli.NewExitError("no user name provided.", 1)
 				}
@@ -290,8 +306,8 @@ func init() {
 					return cli.NewExitError("no user name provided.", 2)
 				}
 
-				if strings.HasSuffix(uname, "_development") {
-					return cli.NewExitError("username should not have _development suffix.", 10)
+				if strings.HasSuffix(uname, "_"+env) {
+					return cli.NewExitError("username should not have _"+env+" suffix.", 10)
 				}
 
 				db, err := connect()
@@ -314,7 +330,7 @@ func init() {
 
 				new_db_name := c.String("dbname")
 				if new_db_name == "" {
-					new_db_name = uname + "_development"
+					new_db_name = uname + "_" + env
 				}
 				dbname_quoted := pq.QuoteIdentifier(new_db_name)
 				uname_quoted := pq.QuoteIdentifier(password)

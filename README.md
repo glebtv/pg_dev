@@ -29,6 +29,8 @@ pg_dev -h
 
 0.1.0 Initial Version
 0.2.0 Reset now uses same syntax as create (user name only)
+0.2.1 support hstore flag
+0.3.0 support env toggle and RAILS_ENV env variable
 
 ## Usage
 
@@ -41,6 +43,16 @@ pg_dev c app
 ```
 
 Creates user app with password app, and app_development database for him.
+
+### Create with env
+
+Create user and db for development
+
+```
+pg_dev --env test c app
+```
+
+Creates user app with password app, and app_test database for him.
 
 ### Reset
 
