@@ -27,10 +27,10 @@ pg_dev -h
 
 ## Changelog
 
-0.1.0 Initial Version
-0.2.0 Reset now uses same syntax as create (user name only)
-0.2.1 support hstore flag
-0.3.0 support env toggle and RAILS_ENV env variable
+- 0.1.0 Initial Version
+- 0.2.0 Reset now uses same syntax as create (user name only)
+- 0.2.1 support hstore flag
+- 0.3.0 support env toggle and RAILS_ENV env variable
 
 ## Usage
 
