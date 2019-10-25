@@ -332,6 +332,9 @@ func init() {
 				if new_db_name == "" {
 					new_db_name = uname + "_" + env
 				}
+				if new_db_name == "postgres" {
+					return cli.NewExitError("refusing to create system db postgres", 50)
+				}
 				dbname_quoted := pq.QuoteIdentifier(new_db_name)
 				uname_quoted := pq.QuoteIdentifier(password)
 
