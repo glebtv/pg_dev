@@ -22,6 +22,7 @@ var port = 0
 var user = ""
 var password = ""
 var auth_db = ""
+var DB *sql.DB
 
 func Execute(command string, arg ...string) {
 	cmd := exec.Command(command, arg...)
@@ -85,7 +86,9 @@ func Quote(name string) string {
 func connect() (*sql.DB, error) {
 	connStr := getConnStr()
 	fmt.Println("connecting:", connStr)
-	return sql.Open("postgres", connStr)
+	var err error
+	DB, err = sql.Open("postgres", connStr)
+	return DB, err
 }
 
 func init() {
@@ -93,7 +96,7 @@ func init() {
 	App.EnableBashCompletion = true
 	App.Name = "pg_dev"
 	App.Usage = "PostgreSQL dev tool "
-	App.Version = "0.2.0"
+	App.Version = "0.2.1"
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, v",
@@ -136,6 +139,10 @@ func init() {
 			Destination: &auth_db,
 		},
 		cli.BoolFlag{
+			Name:  "hstore",
+			Usage: "Add hstore extenstion",
+		},
+		cli.BoolFlag{
 			Name:  "migrate",
 			Usage: "Run rails migrations",
 		},
@@ -150,6 +157,16 @@ func init() {
 		if err != nil {
 			log.Fatal("bundler not found")
 			return nil
+		}
+
+		hstore := c.Bool("hstore")
+		if hstore {
+			q := "CREATE EXTENSION hstore"
+			log.Println(q)
+			_, err = DB.Exec(q)
+			if err != nil {
+				return cli.NewExitError("unable to create extension hstore: "+err.Error(), 14)
+			}
 		}
 
 		fmt.Printf("bundler is available at %s\n", path)
