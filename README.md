@@ -25,6 +25,11 @@ Then verify that `pg_dev` was installed correctly:
 pg_dev -h
 ```
 
+## Changelog
+
+0.1.0 Initial Version
+0.2.0 Reset now uses same syntax as create (user name only)
+
 ## Usage
 
 ### Create
@@ -55,22 +60,26 @@ pg_dev --help
 
 ```
 NAME:
-   pg_dev - PostgreSQL dev tool
+   pg_dev - PostgreSQL dev tool 
 
 USAGE:
-   pg_dev [global options] command [command options] [arguments...]
+   main [global options] command [command options] [arguments...]
 
 VERSION:
-   0.1.0
+   0.2.0
 
 COMMANDS:
-     reset_schema, r  Drop schema, create schema
-     help, h          Shows a list of commands or help for one command
+   create, c  Create user with password {user}, create database {user}_development, and grant him full privileges
+   reset, r   Reset public schema for {user}_development database
+   help, h    Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
+   --auth_db value   authentication database name, default postgres (default: "postgres")
    --host value      postgresql host (default: "localhost") [$PGHOST]
-   --password value  postgresql password (default: "postgres") [$PGPASSWORD]
+   --migrate         Run rails migrations
+   --password value  postgresql password [$PGPASSWORD]
    --port value      postgresql port (default: 5432) [$PGPORT]
+   --seed            Run rails seeds
    --user value      postgresql user (default: "postgres") [$PGUSER]
    --help, -h        show help
    --version, -v     print only the version
@@ -82,28 +91,27 @@ GLOBAL OPTIONS:
 
 ```
 NAME:
-   pg_dev reset_schema - Drop schema, create schema
+   main reset - Reset public schema for {user}_development database
 
 USAGE:
-   pg_dev reset_schema [command options] [arguments...]
+   main reset [command options] [arguments...]
 
 OPTIONS:
-   --schema value, -s value  Owner name (default: "public")
-   --user value, -u value    Owner name
-   --no_drop                 Don't drop, just create
-   --no_create               Don't create, just drop
+   --schema value, -s value    Schema name (default: "public")
+   --dbname value, --db value  Database name, default {user}_development
+   --no_drop                   Don't drop, just create
+   --no_create                 Don't create, just drop
 ```
 
 ```
 > pg_dev c --help
 NAME:
-   pg_dev create - Create user with password {user}, create database {user}_development, and grant him full privileges
+   main create - Create user with password {user}, create database {user}_development, and grant him full privileges
 
 USAGE:
-   pg_dev create [command options] [arguments...]
+   main create [command options] [arguments...]
 
 OPTIONS:
    --set_password value        Set new user password, default {user}
    --dbname value, --db value  Database name, default {user}_development
-   --auth_db_name value        Authentication database name, default postgres (default: "postgres")
  ```

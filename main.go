@@ -18,10 +18,10 @@ import (
 var App *cli.App
 
 var host = ""
-var port = 5432
-var user = "postgres"
+var port = 0
+var user = ""
 var password = ""
-var dbname = ""
+var auth_db = ""
 
 func Execute(command string, arg ...string) {
 	cmd := exec.Command(command, arg...)
@@ -62,8 +62,8 @@ func getConnStr() string {
 	connstr = append(connstr, "port="+strconv.Itoa(port))
 	connstr = append(connstr, "user="+Quote(user))
 
-	if dbname != "" {
-		connstr = append(connstr, "dbname="+Quote(dbname))
+	if auth_db != "" {
+		connstr = append(connstr, "dbname="+Quote(auth_db))
 	}
 
 	if password != "" {
@@ -93,7 +93,7 @@ func init() {
 	App.EnableBashCompletion = true
 	App.Name = "pg_dev"
 	App.Usage = "PostgreSQL dev tool "
-	App.Version = "0.1.0"
+	App.Version = "0.2.0"
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, v",
@@ -129,6 +129,12 @@ func init() {
 			EnvVar:      "PGPASSWORD",
 			Destination: &password,
 		},
+		cli.StringFlag{
+			Name:        "auth_db",
+			Usage:       "authentication database name, default postgres",
+			Value:       "postgres",
+			Destination: &auth_db,
+		},
 		cli.BoolFlag{
 			Name:  "migrate",
 			Usage: "Run rails migrations",
@@ -152,11 +158,13 @@ func init() {
 		if migrate {
 			fmt.Printf("running migrations\n")
 			Execute(path, "exec", "rake db:migrate")
+			fmt.Printf("migrations done\n")
 		}
 		seed := c.Bool("seed")
 		if seed {
 			fmt.Printf("running seeds\n")
 			Execute(path, "exec", "rake db:seed")
+			fmt.Printf("seeds done\n")
 		}
 		fmt.Printf("done!\n")
 		return nil
@@ -164,18 +172,18 @@ func init() {
 
 	App.Commands = []cli.Command{
 		{
-			Name:    "reset_schema",
+			Name:    "reset",
 			Aliases: []string{"r"},
-			Usage:   "Drop schema, create schema",
+			Usage:   "Reset public schema for {user}_development database",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "schema, s",
-					Usage: "Owner name",
+					Usage: "Schema name",
 					Value: "public",
 				},
 				cli.StringFlag{
-					Name:  "owner, o",
-					Usage: "Owner name",
+					Name:  "dbname, db",
+					Usage: "Database name, default {user}_development",
 				},
 				cli.BoolFlag{
 					Name:  "no_drop",
@@ -188,12 +196,19 @@ func init() {
 			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() <= 0 {
-					return cli.NewExitError("no db name provided.", 1)
+					return cli.NewExitError("no user name provided.", 1)
+				}
+				uname := c.Args().Get(0)
+				if uname == "" {
+					return cli.NewExitError("no user name provided.", 2)
 				}
 
-				dbname = c.Args().Get(0)
-				if dbname == "" {
-					return cli.NewExitError("no db name provided.", 2)
+				if strings.HasSuffix(uname, "_development") {
+					return cli.NewExitError("username should not have _development suffix.", 10)
+				}
+
+				if auth_db == "" || auth_db == "postgres" {
+					auth_db = uname + "_development"
 				}
 
 				db, err := connect()
@@ -204,9 +219,7 @@ func init() {
 				schema := c.String("schema")
 				quoted := pq.QuoteIdentifier(schema)
 
-				no_create := c.Bool("no_create")
 				no_drop := c.Bool("no_drop")
-
 				if !no_drop {
 					q := fmt.Sprintf("DROP SCHEMA %s CASCADE", quoted)
 					log.Println(q)
@@ -216,9 +229,9 @@ func init() {
 					}
 				}
 
+				no_create := c.Bool("no_create")
 				if !no_create {
-					user := c.String("owner")
-					quoted_user := pq.QuoteIdentifier(user)
+					quoted_user := pq.QuoteIdentifier(uname)
 					if user != "" {
 						q := fmt.Sprintf("CREATE SCHEMA %s AUTHORIZATION %s", quoted, quoted_user)
 						log.Println(q)
@@ -249,11 +262,6 @@ func init() {
 					Name:  "dbname, db",
 					Usage: "Database name, default {user}_development",
 				},
-				cli.StringFlag{
-					Name:  "auth_db_name",
-					Usage: "Authentication database name, default postgres",
-					Value: "postgres",
-				},
 			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() <= 0 {
@@ -265,7 +273,10 @@ func init() {
 					return cli.NewExitError("no user name provided.", 2)
 				}
 
-				dbname = c.String("auth_db_name")
+				if strings.HasSuffix(uname, "_development") {
+					return cli.NewExitError("username should not have _development suffix.", 10)
+				}
+
 				db, err := connect()
 				if err != nil {
 					return cli.NewExitError("unable to connect to postgresql: "+err.Error(), 3)
@@ -295,14 +306,14 @@ func init() {
 				log.Println(q)
 				_, err = db.Exec(q)
 				if err != nil {
-					return cli.NewExitError("unable to create db "+dbname+": "+err.Error(), 5)
+					return cli.NewExitError("unable to create db "+new_db_name+": "+err.Error(), 5)
 				}
 
 				q = fmt.Sprintf("GRANT ALL ON DATABASE %s TO %s;", dbname_quoted, uname_quoted)
 				log.Println(q)
 				_, err = db.Exec(q)
 				if err != nil {
-					return cli.NewExitError("unable to grant all on db "+dbname+" to user "+uname+": "+err.Error(), 6)
+					return cli.NewExitError("unable to grant all on db "+new_db_name+" to user "+uname+": "+err.Error(), 6)
 				}
 
 				return nil
