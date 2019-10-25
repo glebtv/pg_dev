@@ -97,7 +97,7 @@ func init() {
 	App.EnableBashCompletion = true
 	App.Name = "pg_dev"
 	App.Usage = "PostgreSQL dev tool "
-	App.Version = "0.3.0"
+	App.Version = "0.3.1"
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, v",
