@@ -16,13 +16,21 @@ Assuming you have a working Go environment and `GOPATH/bin` is in your
 `PATH`, `pg_dev` is a breeze to install:
 
 ```shell
-GO111MODULE=on go get github.com/glebtv/pg_dev
+go install github.com/glebtv/pg_dev@latest
 ```
 
 Then verify that `pg_dev` was installed correctly:
 
 ```shell
 pg_dev -h
+```
+
+If not, check your golang and path env vars - example
+
+```
+GOBIN=/data/go/bin
+GOPATH=/data/go
+PATH=/data/go/bin:$PATH
 ```
 
 ## Changelog
