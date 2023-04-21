@@ -97,7 +97,7 @@ func init() {
 	App.EnableBashCompletion = true
 	App.Name = "pg_dev"
 	App.Usage = "PostgreSQL dev tool "
-	App.Version = "0.3.1"
+	App.Version = "0.3.2"
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, v",
@@ -151,6 +151,10 @@ func init() {
 			Usage: "Add hstore extenstion",
 		},
 		cli.BoolFlag{
+			Name:  "postgis",
+			Usage: "Add postgis extenstion",
+		},
+		cli.BoolFlag{
 			Name:  "migrate",
 			Usage: "Run rails migrations",
 		},
@@ -174,6 +178,16 @@ func init() {
 			_, err = DB.Exec(q)
 			if err != nil {
 				return cli.NewExitError("unable to create extension hstore: "+err.Error(), 14)
+			}
+		}
+
+		postgis := c.Bool("postgis")
+		if postgis {
+			q := "CREATE EXTENSION postgis"
+			log.Println(q)
+			_, err = DB.Exec(q)
+			if err != nil {
+				return cli.NewExitError("unable to create extension postgis: "+err.Error(), 14)
 			}
 		}
 
